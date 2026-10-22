@@ -104,8 +104,9 @@ main {
   gap: 4px;
 }
 
+html,
 body {
-  touch-action: manipulation;
+  touch-action: pan-x pan-y;
 }
 
 #face {

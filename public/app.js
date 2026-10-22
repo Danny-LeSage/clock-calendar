@@ -45,6 +45,29 @@ const DURATIONS = [
   { mins: 60, label: '1h' },
 ];
 
+for (const type of ['gesturestart', 'gesturechange', 'gestureend']) {
+  document.addEventListener(type, (e) => e.preventDefault(), { passive: false });
+}
+document.addEventListener(
+  'touchmove',
+  (e) => {
+    if (e.touches.length > 1) e.preventDefault();
+  },
+  { passive: false },
+);
+let lastTouch = { at: 0, x: 0, y: 0 };
+document.addEventListener(
+  'touchend',
+  (e) => {
+    const t = e.changedTouches[0];
+    const now = Date.now();
+    const near = t && Math.hypot(t.clientX - lastTouch.x, t.clientY - lastTouch.y) < 40;
+    if (now - lastTouch.at < 350 && near && !e.target.closest('input, textarea, select')) e.preventDefault();
+    lastTouch = { at: now, x: t?.clientX || 0, y: t?.clientY || 0 };
+  },
+  { passive: false },
+);
+
 const face = document.getElementById('face');
 const caption = document.getElementById('caption');
 const params = new URLSearchParams(location.search);
