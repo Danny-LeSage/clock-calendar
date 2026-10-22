@@ -23,6 +23,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/configure-pages@v5
+      - name: Version the app files so browsers load each new deploy
+        run: |
+          V=${GITHUB_SHA::7}
+          sed -i -E "s#(href|src)=\"(style\.css|app\.js)\"#\1=\"\2?v=$V\"#g" public/index.html
+          sed -i -E "s#from '\./([A-Za-z0-9_-]+)\.js'#from './\1.js?v=$V'#g" public/*.js
+          grep -o 'v=[0-9a-f]*' public/index.html public/*.js | sort | uniq -c
       - uses: actions/upload-pages-artifact@v3
         with:
           path: public
