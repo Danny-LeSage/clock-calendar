@@ -1,0 +1,14 @@
+{
+  "name": "clock-calendar",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "A minimalist clock-face calendar: today's events as two bands (AM outer, PM inner) that the hand wipes away as time passes.",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "ical.js": "^2.1.0"
+  }
+}
