@@ -1,3 +1,5 @@
+import * as googleBrowser from './google-browser.js';
+
 const CONFIG_KEY = 'clockcal.config.v1';
 
 export const PALETTE = ['#e8735a', '#e9b949', '#5db88a', '#5b9bd5', '#a685d6', '#e57fa3'];
@@ -51,6 +53,7 @@ function normalize(raw, extra) {
 }
 
 async function fetchIcs(source, from, to) {
+  if (!(await serverMode)) throw new Error('Calendar links only work in the version running on your computer.');
   const q = new URLSearchParams({ url: source.url, from: from.toISOString(), to: to.toISOString() });
   const res = await fetch(`/api/events?${q}`);
   const body = await res.json().catch(() => ({}));
@@ -70,6 +73,24 @@ export const GOOGLE_EVENT_COLORS = {
   7: '#039be5', 8: '#616161', 9: '#3f51b5', 10: '#0b8043', 11: '#d50000',
 };
 
+export const serverMode = fetch('api/ping')
+  .then(async (r) => r.ok && (await r.json().catch(() => ({}))).ok === true)
+  .catch(() => false);
+let onServer = true;
+serverMode.then((v) => {
+  onServer = v;
+  if (!v) googleBrowser.preload().catch(() => {});
+});
+export const googleConnectInBrowser = () => googleBrowser.connect();
+export const googleNeedsReconnect = () => !onServer && googleBrowser.needsReconnect();
+
+const BROWSER_ACTIONS = {
+  create: async (b) => ({ event: await googleBrowser.create(b) }),
+  update: (b) => googleBrowser.update(b),
+  delete: (b) => googleBrowser.remove(b),
+  disconnect: async () => googleBrowser.disconnect(),
+};
+
 async function call(path, options) {
   const res = await fetch(path, options);
   const body = await res.json().catch(() => ({}));
@@ -77,13 +98,19 @@ async function call(path, options) {
   return body;
 }
 const post = (source, action, body = {}) =>
-  call(`/api/${source}/${action}`, {
+  !onServer && source === 'google' && BROWSER_ACTIONS[action]
+    ? BROWSER_ACTIONS[action](body)
+    : call(`/api/${source}/${action}`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(body),
   });
 
 export async function accountStatus(source) {
+  if (!(await serverMode)) {
+    if (source === 'google') return googleBrowser.status();
+    return { configured: false, connected: false, calendars: [], unavailable: true };
+  }
   try {
     return await call(`/api/${source}/status`);
   } catch {
@@ -155,6 +182,9 @@ export function pushDelete(ev) {
 }
 
 async function fetchAccount(source, from, to) {
+  if (!(await serverMode) && source === 'google') {
+    return { events: (await googleBrowser.events(from, to)).map((e) => fromAccount(source, e)) };
+  }
   const q = new URLSearchParams({ from: from.toISOString(), to: to.toISOString() });
   const body = await call(`/api/${source}/events?${q}`);
   return { events: body.events.map((e) => fromAccount(source, e)) };

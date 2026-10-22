@@ -30,6 +30,14 @@ Then open http://localhost:4321.
 
 To use it like a desktop widget, open it in Chrome or Edge and choose **Install app** from the menu. It then runs in its own small window that you can resize to a square.
 
+## Online version (GitHub Pages)
+
+https://danny-lesage.github.io/clock-calendar/ is deployed from `public/` on every push to `main`.
+
+Without the server, the app runs entirely in the browser. Google Calendar signs in with a Google popup, and the sign-in is kept in your browser (it lasts about an hour, then a **Reconnect Google** button appears). iCloud and calendar links need the server, so they only work in the version running on your computer.
+
+The Google client ID used online is in `public/config.js` (client IDs aren't secret). Its OAuth client must list `https://danny-lesage.github.io` under **Authorised JavaScript origins**.
+
 ## Connect your calendars
 
 Open settings (`···`, bottom right) and pick **Google**, **iCloud** or **Link**.

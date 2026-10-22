@@ -250,6 +250,7 @@ const server = http.createServer(async (req, res) => {
   if (pathname === '/auth/google/start' || pathname === '/auth/google/callback') {
     return handleGoogleAuth(req, res, pathname, searchParams);
   }
+  if (pathname === '/api/ping') return sendJson(res, 200, { ok: true });
   if (pathname === '/api/events') return handleEvents(req, res, searchParams);
   return serveStatic(res, pathname);
 });

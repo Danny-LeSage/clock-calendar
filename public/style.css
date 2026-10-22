@@ -973,3 +973,30 @@ body:hover #tray,
   width: 12px;
   height: 12px;
 }
+
+.only-browser {
+  display: none;
+  margin-top: 8px;
+}
+.no-server .only-browser {
+  display: block;
+}
+.no-server [data-connect='apple'],
+.no-server [data-connect='link'],
+.no-server #panel-apple,
+.no-server #panel-link,
+.no-server #panel-google {
+  display: none;
+}
+#reconnect {
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--fg);
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+#reconnect[hidden] {
+  display: none;
+}

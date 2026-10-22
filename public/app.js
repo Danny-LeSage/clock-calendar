@@ -15,6 +15,9 @@ import {
   pushDelete,
   GOOGLE_EVENT_COLORS,
   nearestGoogleColorId,
+  serverMode,
+  googleConnectInBrowser,
+  googleNeedsReconnect,
 } from './sources.js';
 import {
   C,
@@ -75,6 +78,7 @@ const state = {
   hoverClock: false,
   preview: null,
   loading: false,
+  onServer: true,
 };
 state.hasSources = state.config.sources.length > 0 || state.config.google.enabled || state.config.apple.enabled;
 
@@ -1124,8 +1128,14 @@ async function disconnectAccount(source) {
   renderSettings();
 }
 
+function renderReconnect() {
+  reconnectBtn.hidden = !(state.config.google.enabled && googleNeedsReconnect());
+}
+
 function renderSettings() {
+  renderReconnect();
   document.documentElement.classList.toggle('no-sources', !state.hasSources);
+  document.documentElement.classList.toggle('no-server', !state.onServer);
   if (!dialog.open) return;
 
   const style = currentStyle();
@@ -1244,10 +1254,28 @@ styleRow.addEventListener('click', (e) => {
 document.querySelector('.connect-row').addEventListener('click', (e) => {
   const which = e.target.closest('[data-connect]')?.dataset.connect;
   if (!which) return;
+  if (which === 'google' && !state.onServer) return connectGoogleInBrowser();
   if (which === 'google' && state.google.configured) return startGoogle();
   for (const [name, panel] of Object.entries(panels)) panel.hidden = name !== which || !panel.hidden;
   panels[which].querySelector('input')?.focus();
 });
+
+const reconnectBtn = document.getElementById('reconnect');
+reconnectBtn.addEventListener('click', connectGoogleInBrowser);
+
+function connectGoogleInBrowser() {
+  googleConnectInBrowser()
+    .then(async () => {
+      state.config.google.enabled = true;
+      state.hasSources = true;
+      saveConfig(state.config);
+      clearDemo();
+      showToast('Google Calendar connected', false);
+      await loadAccounts();
+      await refresh();
+    })
+    .catch((err) => showToast(err.message, false));
+}
 
 function startGoogle() {
   state.config.google.enabled = true;
@@ -1375,6 +1403,10 @@ seedDemo(clockNow());
 renderSettings();
 refresh();
 loadAccounts();
+serverMode.then((v) => {
+  state.onServer = v;
+  renderSettings();
+});
 
 let ticks = 0;
 setInterval(() => {

@@ -15,6 +15,7 @@
     <main>
       <div id="face"></div>
       <p id="caption" aria-live="polite"></p>
+      <button id="reconnect" type="button" hidden>Reconnect Google</button>
       <div id="tray" role="group" aria-label="Drag a colour onto the clock to add an event"></div>
 
       <div id="editor" hidden>
@@ -99,6 +100,8 @@
         </form>
         <p id="apple-error" class="error" hidden></p>
       </div>
+
+      <p class="hint only-browser">iCloud and calendar links work in the version running on your computer.</p>
 
       <div id="panel-link" class="panel" hidden>
         <p class="hint">Read-only. Works with any calendar that has an .ics or webcal link (Outlook, school or team calendars, …).</p>
