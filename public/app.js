@@ -445,7 +445,7 @@ function openEditor(id, isNew = false) {
     const ev = findEvent(id);
     edTitle.value = ev?.title || '';
     state.editing.originalTitle = ev?.title || '';
-    if (isNew || !matchMedia('(hover: none)').matches) edTitle.focus();
+    if (isNew || !matchMedia('(hover: none)').matches) edTitle.focus({ preventScroll: true });
   }
 }
 

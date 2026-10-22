@@ -97,10 +97,15 @@ body {
 }
 
 main {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 4px;
+}
+
+body {
+  touch-action: manipulation;
 }
 
 #face {
@@ -810,9 +815,14 @@ body:hover #tray,
 
 .editing #caption,
 .editing #tray {
-  display: none;
+  visibility: hidden;
 }
 #editor {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  transform: translateX(-50%);
+  z-index: 6;
   width: min(460px, calc(100vw - 32px));
   background: var(--panel);
   border: 1px solid var(--line);
@@ -999,4 +1009,17 @@ body:hover #tray,
 }
 #reconnect[hidden] {
   display: none;
+}
+
+@media (hover: none), (pointer: coarse) {
+  #editor {
+    position: fixed;
+    top: calc(env(safe-area-inset-top) + 10px);
+    bottom: auto;
+  }
+  #ed-title,
+  dialog input,
+  dialog select {
+    font-size: 16px;
+  }
 }
