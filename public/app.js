@@ -99,6 +99,7 @@ const state = {
   dragId: null,
   hover: null,
   hoverClock: false,
+  showAll: false,
   preview: null,
   loading: false,
   onServer: true,
@@ -231,7 +232,7 @@ function render() {
   parts.svg.classList.toggle('dragging', Boolean(state.drag));
   parts.svg.dataset.half = now.getHours() < 12 ? 'am' : 'pm';
   parts.svg.setAttribute('aria-label', ariaSummary(now, events));
-  parts.bands.innerHTML = bandsSvg(events, now, { focused: focusId, hover: state.hover, showDone: state.hoverClock && state.config.showPastOnHover !== false, preview: state.preview, fmtRange });
+  parts.bands.innerHTML = bandsSvg(events, now, { focused: focusId, hover: state.hover, showDone: state.showAll || (state.hoverClock && state.config.showPastOnHover !== false), preview: state.preview, fmtRange });
   parts.info.innerHTML = infoSvg(style, now, events, focus);
   const cap = captionHtml(style, now, events, focus);
   if (cap !== lastCaption) {
@@ -536,7 +537,7 @@ function removeEvent(id) {
 }
 
 let toastTimer = 0;
-function showToast(text, withUndo = true) {
+function showToast(text, withUndo = true, ms = 5000) {
   toast.querySelector('span').textContent = text;
   toast.querySelector('button').hidden = !withUndo;
   toast.hidden = false;
@@ -544,7 +545,7 @@ function showToast(text, withUndo = true) {
   toastTimer = setTimeout(() => {
     toast.hidden = true;
     undo = null;
-  }, 5000);
+  }, ms);
 }
 toast.querySelector('button').addEventListener('click', () => {
   undo?.();
@@ -843,9 +844,21 @@ function endPress(e) {
     if (spot) openEditor(addLocal(spot.start, spot.end).id, true);
     return;
   }
-  if (state.editing) closeEditor();
-  setFocus(null);
+  if (state.editing || state.focus) {
+    if (state.editing) closeEditor();
+    setFocus(null);
+    return;
+  }
+  if (e.pointerType !== 'mouse') setShowAll(!state.showAll);
 }
+
+function setShowAll(on) {
+  if (state.showAll === on) return;
+  state.showAll = on;
+  showToast(on ? 'Showing finished events' : 'Finished events hidden', false, 1600);
+  render();
+}
+
 face.addEventListener('pointerleave', () => {
   if ((state.hover || state.hoverClock) && !press) {
     state.hover = null;
@@ -857,6 +870,7 @@ document.addEventListener('pointerdown', (e) => {
   if (e.target.closest('#face, #editor, #tray, #toast, dialog, #gear')) return;
   if (state.editing) closeEditor();
   if (state.focus) setFocus(null);
+  if (state.showAll) setShowAll(false);
 });
 face.addEventListener('pointerup', endPress);
 face.addEventListener('pointercancel', endPress);
