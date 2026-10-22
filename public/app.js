@@ -143,7 +143,8 @@ function focusOf(now, events) {
   const shownId = state.dragId || state.focus;
   const picked = shownId && timed.find((e) => e.id === shownId);
   if (picked) {
-    const hint = state.editing || state.drag ? '' : ' · double-click to edit';
+    const tap = matchMedia('(hover: none)').matches ? 'tap' : 'click';
+    const hint = state.editing || state.drag ? '' : ` · ${tap} again to edit`;
     return { ev: picked, sub: `${fmtRange(picked)}${hint}` };
   }
   const current = timed
@@ -831,7 +832,7 @@ function endPress(e) {
   lastClick = isDouble ? { at: 0, id: null, x: 0, y: 0 } : { at: t, id, x: e.clientX, y: e.clientY };
 
   if (id) {
-    if (isDouble) openEditor(id);
+    if (isDouble || (state.focus === id && !state.editing)) openEditor(id);
     else {
       if (state.editing && state.editing.id !== id) closeEditor();
       setFocus(id);

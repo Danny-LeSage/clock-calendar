@@ -1024,3 +1024,10 @@ body:hover #tray,
     font-size: 16px;
   }
 }
+
+.done-seg {
+  opacity: 0.5;
+}
+.ring.inactive .done-seg {
+  opacity: 1;
+}

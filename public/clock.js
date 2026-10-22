@@ -199,7 +199,7 @@ function segmentSvg(seg, w, nowMs, ctx) {
       out += `<text class="arc-label${sel}" fill="${ink}" font-size="${f(size)}" dominant-baseline="central"><textPath href="#${pid}" startOffset="50%" text-anchor="middle">${esc(text)}</textPath></text>`;
     }
   }
-  return out;
+  return done ? `<g class="done-seg">${out}</g>` : out;
 }
 
 const DEFS = `
