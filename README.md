@@ -38,6 +38,31 @@ Without the server, the app runs entirely in the browser. Google Calendar signs 
 
 The Google client ID used online is in `public/config.js` (client IDs aren't secret). Its OAuth client must list `https://danny-lesage.github.io` under **Authorised JavaScript origins**.
 
+## Phone apps (iOS and Android)
+
+The same code in `public/` also builds native iOS and Android apps with [Capacitor](https://capacitorjs.com). There are three ways to run the clock, all from one codebase:
+
+| Build | How | Calendars |
+| --- | --- | --- |
+| Web, online | GitHub Pages (automatic on push) | Google |
+| Web, on your computer | `npm start` | Google, iCloud, links |
+| iOS / Android app | `npm run ios` / `npm run android` | Phone calendar, iCloud, links |
+
+In the apps, the clock uses the **phone's own calendar** first. On first launch it asks for calendar access, then shows every calendar on the phone (iCloud, Google, Outlook, Exchange, …) with two-way sync. **iCloud** and **Link** are still there for calendars that aren't on the phone. Google sign-in isn't offered in the apps, because Google blocks it inside apps: add the Google account to the phone instead and it shows up under Phone.
+
+The apps don't need the server: iCloud and calendar links are fetched by the app itself (`public/native-sync.js`).
+
+### Build and run
+
+After changing anything in `public/`, run `npm run sync` to copy it into both native projects.
+
+- **Android:** install [Android Studio](https://developer.android.com/studio), then `npm run android` opens the project. Press Run to install on a phone (USB debugging on) or an emulator.
+- **iOS:** needs a Mac with Xcode. `npm install`, then `npm run ios` opens the project in Xcode. Pick your team under *Signing & Capabilities* and press Run.
+
+Every push also builds both apps on GitHub (`.github/workflows/mobile.yml`). The Android debug APK can be downloaded from the run's artifacts and installed directly on a phone.
+
+To publish to the App Store or Google Play you'll need an Apple Developer account ($99/year) and a Google Play developer account ($25 once), plus release signing keys. App icons and splash screens are generated from `assets/` with `npx @capacitor/assets generate`.
+
 ## Connect your calendars
 
 Open settings (`···`, bottom right) and pick **Google**, **iCloud** or **Link**.
@@ -64,10 +89,16 @@ Paste any `.ics` or `webcal://` link, such as an Outlook, school or team calenda
 
 - `public/clock.js`: draws the bands, the wipe, the arc labels and the hands
 - `public/app.js`: keeps the clock ticking, plus the caption and the settings panel
-- `public/sources.js`: loads events from calendar links, Google and the demo
+- `public/sources.js`: loads events from calendar links, Google, iCloud, the phone and the demo, and picks the server, browser or phone-app way of doing it
+- `public/platform.js`: tells whether it's running in the phone app, and calls native plugins
+- `public/device-calendar.js`: the phone's own calendar (phone apps only)
+- `public/native-sync.js`: iCloud and calendar links inside the phone apps
+- `public/shared/`: code used by both the server and the phone apps (`.ics` reading, iCloud CalDAV)
+- `public/vendor/ical.js`: ical.js, copied from `node_modules` (`npm run vendor` updates it)
+- `android/`, `ios/`: the native projects. `DavHttpPlugin.java` sends iCloud requests that Android's normal HTTP refuses
 - `server.js`: serves the app and downloads calendar links for the browser
-- `lib/ics.js`: reads `.ics` calendars, including repeating events and time zones
+- `lib/ics.js`: reads `.ics` calendars, including repeating events and time zones (from `public/shared/ics.js`)
 - `lib/google.js`: Google sign-in and two-way sync
-- `lib/apple.js`: iCloud two-way sync (CalDAV)
+- `lib/apple.js`: iCloud two-way sync (CalDAV), saving the account in `data/`
 
 Run the tests with `npm test`. The iCloud tests run against a small fake CalDAV server.

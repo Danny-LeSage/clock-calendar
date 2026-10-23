@@ -6,9 +6,21 @@
   "description": "A minimalist clock-face calendar: today's events as two bands (AM outer, PM inner) that the hand wipes away as time passes.",
   "scripts": {
     "start": "node server.js",
-    "test": "node --test"
+    "test": "node --test",
+    "sync": "cap sync",
+    "android": "cap sync android && cap open android",
+    "ios": "cap sync ios && cap open ios",
+    "vendor": "node -e \"require('fs').copyFileSync('node_modules/ical.js/dist/ical.min.js','public/vendor/ical.js')\""
   },
   "dependencies": {
+    "@capacitor/android": "8.5.3",
+    "@capacitor/app": "8.1.2",
+    "@capacitor/core": "8.5.3",
+    "@capacitor/ios": "8.5.3",
+    "@ebarooni/capacitor-calendar": "8.8.0",
     "ical.js": "^2.1.0"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "8.5.3"
   }
 }
