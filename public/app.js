@@ -18,7 +18,9 @@ import {
   serverMode,
   googleConnectInBrowser,
   googleNeedsReconnect,
+  phoneConnect,
 } from './sources.js';
+import { isNative, native, onNative } from './platform.js';
 import {
   C,
   TAU,
@@ -89,6 +91,7 @@ const state = {
   hasSources: false,
   google: { configured: false, connected: false, calendars: [] },
   apple: { connected: false, calendars: [] },
+  phone: { connected: false, calendars: [] },
   pending: new Map(),
   deleting: new Set(),
   local: loadLocal(),
@@ -104,7 +107,8 @@ const state = {
   loading: false,
   onServer: true,
 };
-state.hasSources = state.config.sources.length > 0 || state.config.google.enabled || state.config.apple.enabled;
+state.hasSources =
+  state.config.sources.length > 0 || Object.keys(ACCOUNTS).some((s) => state.config[s]?.enabled);
 
 const styleParam = params.get('style');
 const currentStyle = () =>
@@ -366,12 +370,17 @@ function addLocal(start, end, color) {
 
 function targets() {
   const out = [{ value: 'local', label: 'This clock only' }];
-  if (state.config.google.enabled && state.google.connected) {
+  if (state.config.phone.enabled && state.phone.connected) {
+    for (const c of state.phone.calendars || []) {
+      out.push({ value: `phone|${c.id}`, label: `Phone · ${c.name}`, primary: c.primary });
+    }
+  }
+  if (ACCOUNTS.google && state.config.google.enabled && state.google.connected) {
     for (const c of state.google.calendars || []) {
       out.push({ value: `google|${c.id}`, label: `Google · ${c.name}`, primary: c.primary });
     }
   }
-  if (state.config.apple.enabled && state.apple.connected) {
+  if (ACCOUNTS.apple && state.config.apple.enabled && state.apple.connected) {
     for (const c of state.apple.calendars || []) out.push({ value: `apple|${c.id}`, label: `iCloud · ${c.name}` });
   }
   return out;
@@ -381,8 +390,11 @@ function newEventTarget() {
   const options = targets();
   const chosen = state.config.newEventsTo;
   if (chosen && options.some((o) => o.value === chosen)) return chosen;
-  const google = options.find((o) => o.primary) || options.find((o) => o.value.startsWith('google|'));
-  return (google || options.find((o) => o.value.startsWith('apple|')) || options[0]).value;
+  const preferred =
+    options.find((o) => o.primary) ||
+    options.find((o) => o.value.startsWith('phone|')) ||
+    options.find((o) => o.value.startsWith('google|'));
+  return (preferred || options.find((o) => o.value.startsWith('apple|')) || options[0]).value;
 }
 
 function targetLabel(target) {
@@ -1096,9 +1108,9 @@ const panels = {
 };
 
 async function loadAccounts() {
-  const [g, a] = await Promise.all([accountStatus('google'), accountStatus('apple')]);
-  state.google = g;
-  state.apple = a;
+  const sources = Object.keys(ACCOUNTS);
+  const results = await Promise.all(sources.map((s) => accountStatus(s)));
+  sources.forEach((s, i) => (state[s] = results[i]));
   renderSettings();
   renderTray();
 }
@@ -1149,6 +1161,7 @@ function sourceRow({ name, title, state: st, color, onRemove, onColor, icon }) {
 }
 
 const ICONS = {
+  phone: document.querySelector('[data-connect="phone"] svg').outerHTML,
   google: document.querySelector('[data-connect="google"] svg').outerHTML,
   apple: document.querySelector('[data-connect="apple"] svg').outerHTML,
 };
@@ -1173,7 +1186,7 @@ function renderReconnect() {
 function renderSettings() {
   renderReconnect();
   document.documentElement.classList.toggle('no-sources', !state.hasSources);
-  document.documentElement.classList.toggle('no-server', !state.onServer);
+  document.documentElement.classList.toggle('no-server', !state.onServer && !isNative);
   if (!dialog.open) return;
 
   const style = currentStyle();
@@ -1292,6 +1305,7 @@ styleRow.addEventListener('click', (e) => {
 document.querySelector('.connect-row').addEventListener('click', (e) => {
   const which = e.target.closest('[data-connect]')?.dataset.connect;
   if (!which) return;
+  if (which === 'phone') return connectPhone();
   if (which === 'google' && !state.onServer) return connectGoogleInBrowser();
   if (which === 'google' && state.google.configured) return startGoogle();
   for (const [name, panel] of Object.entries(panels)) panel.hidden = name !== which || !panel.hidden;
@@ -1313,6 +1327,24 @@ function connectGoogleInBrowser() {
       await refresh();
     })
     .catch((err) => showToast(err.message, false));
+}
+
+function connectPhone({ quiet = false } = {}) {
+  state.config.phone.asked = true;
+  saveConfig(state.config);
+  return phoneConnect()
+    .then(async () => {
+      state.config.phone.enabled = true;
+      state.hasSources = true;
+      saveConfig(state.config);
+      clearDemo();
+      if (!quiet) showToast('Phone calendar connected', false);
+      await loadAccounts();
+      await refresh();
+    })
+    .catch((err) => {
+      if (!quiet) showToast(err.message, false);
+    });
 }
 
 function startGoogle() {
@@ -1441,6 +1473,14 @@ seedDemo(clockNow());
 renderSettings();
 refresh();
 loadAccounts();
+// In the phone app, start with the phone's own calendar (asks for permission once).
+if (isNative && !state.config.phone.asked && !state.config.phone.enabled) connectPhone({ quiet: true });
+
+// Android back button: close settings first, then leave the app in the background.
+onNative('App', 'backButton', () => {
+  if (dialog.open) dialog.close();
+  else native('App', 'minimizeApp').catch(() => {});
+});
 serverMode.then((v) => {
   state.onServer = v;
   renderSettings();

@@ -1,4 +1,5 @@
 import * as googleBrowser from './google-browser.js';
+import { isNative } from './platform.js';
 
 const CONFIG_KEY = 'clockcal.config.v1';
 
@@ -29,6 +30,7 @@ export function loadConfig() {
     sources: Array.isArray(c.sources) ? c.sources : [],
     google: { enabled: false, ...(c.google || {}) },
     apple: { enabled: false, ...(c.apple || {}) },
+    phone: { enabled: false, ...(c.phone || {}) },
   };
 }
 
@@ -53,11 +55,16 @@ function normalize(raw, extra) {
 }
 
 async function fetchIcs(source, from, to) {
-  if (!(await serverMode)) throw new Error('Calendar links only work in the version running on your computer.');
-  const q = new URLSearchParams({ url: source.url, from: from.toISOString(), to: to.toISOString() });
-  const res = await fetch(`/api/events?${q}`);
-  const body = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(body.error || `Request failed (${res.status})`);
+  let body;
+  if (isNative) {
+    body = await (await import('./native-sync.js')).linkEvents(source.url, from, to);
+  } else {
+    if (!(await serverMode)) throw new Error('Calendar links only work in the version running on your computer.');
+    const q = new URLSearchParams({ url: source.url, from: from.toISOString(), to: to.toISOString() });
+    const res = await fetch(`/api/events?${q}`);
+    body = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(body.error || `Request failed (${res.status})`);
+  }
   return {
     name: body.name || '',
     events: body.events.map((e, i) =>
@@ -66,23 +73,38 @@ async function fetchIcs(source, from, to) {
   };
 }
 
-export const ACCOUNTS = { google: 'Google Calendar', apple: 'iCloud' };
+// In the phone app, Google accounts come in through the phone's calendar
+// (Google blocks its sign-in inside app web views).
+export const ACCOUNTS = isNative
+  ? { phone: 'Phone calendar', apple: 'iCloud' }
+  : { google: 'Google Calendar', apple: 'iCloud' };
+
+// Accounts that run inside the phone app instead of on the server.
+const IN_APP = isNative
+  ? {
+      phone: () => import('./device-calendar.js'),
+      apple: async () => (await import('./native-sync.js')).apple,
+    }
+  : {};
 
 export const GOOGLE_EVENT_COLORS = {
   1: '#7986cb', 2: '#33b679', 3: '#8e24aa', 4: '#e67c73', 5: '#f6bf26', 6: '#f4511e',
   7: '#039be5', 8: '#616161', 9: '#3f51b5', 10: '#0b8043', 11: '#d50000',
 };
 
-export const serverMode = fetch('api/ping')
-  .then(async (r) => r.ok && (await r.json().catch(() => ({}))).ok === true)
-  .catch(() => false);
-let onServer = true;
+export const serverMode = isNative
+  ? Promise.resolve(false)
+  : fetch('api/ping')
+      .then(async (r) => r.ok && (await r.json().catch(() => ({}))).ok === true)
+      .catch(() => false);
+let onServer = !isNative;
 serverMode.then((v) => {
   onServer = v;
-  if (!v) googleBrowser.preload().catch(() => {});
+  if (!v && !isNative) googleBrowser.preload().catch(() => {});
 });
 export const googleConnectInBrowser = () => googleBrowser.connect();
-export const googleNeedsReconnect = () => !onServer && googleBrowser.needsReconnect();
+export const googleNeedsReconnect = () => !onServer && !isNative && googleBrowser.needsReconnect();
+export const phoneConnect = async () => (await IN_APP.phone()).connect();
 
 const BROWSER_ACTIONS = {
   create: async (b) => ({ event: await googleBrowser.create(b) }),
@@ -97,8 +119,19 @@ async function call(path, options) {
   if (!res.ok) throw new Error(body.error || `Request failed (${res.status})`);
   return body;
 }
+async function inApp(source, action, body) {
+  const acct = await IN_APP[source]();
+  if (action === 'create') return { event: await acct.create(body) };
+  if (action === 'delete') return acct.remove(body);
+  if (action === 'connect') return acct.connect(body.appleId, body.password);
+  if (!acct[action]) throw new Error('Not available in the phone app.');
+  return acct[action](body);
+}
+
 const post = (source, action, body = {}) =>
-  !onServer && source === 'google' && BROWSER_ACTIONS[action]
+  IN_APP[source]
+    ? inApp(source, action, body)
+    : !onServer && source === 'google' && BROWSER_ACTIONS[action]
     ? BROWSER_ACTIONS[action](body)
     : call(`/api/${source}/${action}`, {
     method: 'POST',
@@ -107,6 +140,13 @@ const post = (source, action, body = {}) =>
   });
 
 export async function accountStatus(source) {
+  if (IN_APP[source]) {
+    try {
+      return await (await IN_APP[source]()).status();
+    } catch {
+      return { connected: false, calendars: [] };
+    }
+  }
   if (!(await serverMode)) {
     if (source === 'google') return googleBrowser.status();
     return { configured: false, connected: false, calendars: [], unavailable: true };
@@ -182,6 +222,9 @@ export function pushDelete(ev) {
 }
 
 async function fetchAccount(source, from, to) {
+  if (IN_APP[source]) {
+    return { events: (await (await IN_APP[source]()).events(from, to)).map((e) => fromAccount(source, e)) };
+  }
   if (!(await serverMode) && source === 'google') {
     return { events: (await googleBrowser.events(from, to)).map((e) => fromAccount(source, e)) };
   }

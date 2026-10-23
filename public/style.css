@@ -315,8 +315,8 @@ body {
 
 #gear {
   position: fixed;
-  right: 16px;
-  bottom: 16px;
+  right: calc(16px + env(safe-area-inset-right));
+  bottom: calc(16px + env(safe-area-inset-bottom));
   width: 40px;
   height: 40px;
   border-radius: 50%;
@@ -940,7 +940,7 @@ body:hover #tray,
 #toast {
   position: fixed;
   left: 50%;
-  bottom: 20px;
+  bottom: calc(20px + env(safe-area-inset-bottom));
   transform: translateX(-50%);
   display: flex;
   align-items: center;
@@ -985,9 +985,22 @@ body:hover #tray,
   height: 12px;
 }
 
-.only-browser {
+.only-browser,
+.only-native {
   display: none;
   margin-top: 8px;
+}
+.native .only-native {
+  display: block;
+}
+[data-connect='phone'],
+.native [data-connect='google'],
+.native #panel-google,
+.native #reconnect {
+  display: none;
+}
+.native [data-connect='phone'] {
+  display: inline-flex;
 }
 .no-server .only-browser {
   display: block;
